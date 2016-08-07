@@ -37,11 +37,11 @@ def main():
     with open('pokesms.config.json') as f:
         config = json.load(f)
     logging.debug(config)
-    session = db.Session()
     twilio = MessageClient(config['twilio']['number'],config['twilio']['account_sid'],config['twilio']['auth_token'])
     spawns = {}
     
     while True:
+        session = db.Session()
         for pokemon_id in config['pokemon']:
             logging.info("Checking spawns for {pokemon_id}...".format(pokemon_id=pokemon_id))
             newspawns = dbmore.getCurrentSpawns(session,pokemon_id)
@@ -51,6 +51,8 @@ def main():
                 spawns[pokemon_id] = []
             if newspawns is not None:
                 added, removed = diff(spawns[pokemon_id], newspawns)
+                logging.debug("added: {added}".format(added=added))
+                logging.debug("removed: {removed}".format(removed=removed))
                 spawns[pokemon_id] = newspawns
             for newspawn in added:
                 logging.info("Pokemon {id} spawned at {lat},{lon}, expires in {expires}".format(id=newspawn.pokemon_id,lat=newspawn.lat,lon=newspawn.lon,expires=newspawn.minsRemaining))
@@ -58,15 +60,19 @@ def main():
                     location, hood, zip, address = '','','',''
                     try:
                         location = getLocation(newspawn)
-                        hood = location.raw['address']['neighbourhood']
+                        if 'neighbourhood' in location.raw['address']:
+                            hood = location.raw['address']['neighbourhood']
+                        else:
+                            hood = location.raw['address']['city']
                         zip = location.raw['address']['postcode']
-                        address = "{hn} {road}".format(hn=location.raw['address']['house_number'],road=location.raw['address']['road'])
+                        if 'house_number' in location.raw['address']:
+                            address = "{hn} {road}".format(hn=location.raw['address']['house_number'],road=location.raw['address']['road'])
                     except Exception as e:
                         logging.error("FUCK {e}".format(e=e))
                     message = "{name} spawned in {hood} ({zip}), available for {expires} minutes. {address} {link}".format(link=getMapLink(newspawn),address=address,hood=hood,zip=zip,name=getPokemonName(newspawn.pokemon_id),expires=newspawn.minsRemaining)
                     for number in config['destinations']:
                         logging.info('Sending "{message}" to {number}...'.format(message=message,number=number))
-                        twilio.send_message(message,number)
+                        #twilio.send_message(message,number)
                 except Exception as e:
                     logging.error("FUCK {e}".format(e=e))
             for spawn in removed:
