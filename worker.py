@@ -22,12 +22,14 @@ import utils
 # Check whether config has all necessary attributes
 REQUIRED_SETTINGS = (
     'DB_ENGINE',
+    'ENCRYPT_PATH',
     'CYCLES_PER_WORKER',
     'MAP_START',
     'MAP_END',
     'GRID',
     'ACCOUNTS',
     'SCAN_RADIUS',
+    'SCAN_DELAY',
 )
 for setting_name in REQUIRED_SETTINGS:
     if not hasattr(config, setting_name):
@@ -49,7 +51,7 @@ def configure_logger(filename='worker.log'):
             '[%(asctime)s][%(threadName)10s][%(levelname)8s][L%(lineno)4d] '
             '%(message)s'
         ),
-        style='{',
+        style='%',
         level=logging.INFO,
     )
 
@@ -79,6 +81,7 @@ class Slave(threading.Thread):
         self.running = True
         center = self.points[0]
         self.api = PGoApi()
+        self.api.activate_signature(config.ENCRYPT_PATH)
         self.api.set_position(center[0], center[1], 100)  # lat, lon, alt
 
     def run(self):
@@ -186,7 +189,9 @@ class Slave(threading.Thread):
             if self.error_code and self.seen_per_cycle:
                 self.error_code = None
             self.step += 1
-            time.sleep(random.uniform(5, 7))
+            time.sleep(
+                random.uniform(config.SCAN_DELAY, config.SCAN_DELAY + 2)
+            )
         session.close()
         if self.seen_per_cycle == 0:
             self.error_code = 'NO POKEMON'
