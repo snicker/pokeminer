@@ -54,21 +54,21 @@ def webhook():
 
 @app.route('/rarespawns')
 def rarespawns():
+    map_center = utils.get_map_center()
     return render_template(
-        'raresmap.html',
-        key=web.GOOGLEMAPS_KEY,
-        fullmap=web.get_map(),
-        auto_refresh=web.AUTO_REFRESH * 1000,
+        'newmap2.html',
+        area_name=app_config.AREA_NAME,
+        map_center=map_center,
         endpoint='/data/rares'
     )
 
 @app.route('/<int:pokemon_id>')
 def currentspawns(pokemon_id):
+    map_center = utils.get_map_center()
     return render_template(
-        'raresmap.html',
-        key=web.GOOGLEMAPS_KEY,
-        fullmap=web.get_map(),
-        auto_refresh=web.AUTO_REFRESH * 1000,
+        'newmap2.html',
+        area_name=app_config.AREA_NAME,
+        map_center=map_center,
         endpoint='/data/bypokemon/' + str(pokemon_id)
     )
 
@@ -76,15 +76,48 @@ def get_rare_pokemarkers():
     session = db.Session()
     pokemons = dbmore.getRareSpawns(session)
     session.close()
-    return get_pokemarkers(pokemons)
+    return get_pokemarkers(pokemons=pokemons)
 
 def get_pokemarkers_for_pokemon(pokemon_id):
     session = db.Session()
     pokemons = dbmore.getCurrentSpawns(session,pokemon_id=pokemon_id)
     session.close()
-    return get_pokemarkers(pokemons)
-    
-def get_pokemarkers(pokemons):
+    return get_pokemarkers(pokemons=pokemons)
+
+def get_pokemarkers(pokemons={},forts={}):
+    markers = []
+
+    for pokemon in pokemons:
+        markers.append({
+            'id': 'pokemon-{}'.format(pokemon.id),
+            'type': 'pokemon',
+            'trash': pokemon.pokemon_id in app_config.TRASH_IDS,
+            'name': web.POKEMON_NAMES[pokemon.pokemon_id],
+            'pokemon_id': pokemon.pokemon_id,
+            'lat': pokemon.lat,
+            'lon': pokemon.lon,
+            'expires_at': pokemon.expire_timestamp,
+        })
+    for fort in forts:
+        if fort['guard_pokemon_id']:
+            pokemon_name = web.POKEMON_NAMES[fort['guard_pokemon_id']]
+        else:
+            pokemon_name = 'Empty'
+        markers.append({
+            'id': 'fort-{}'.format(fort['fort_id']),
+            'sighting_id': fort['id'],
+            'type': 'fort',
+            'prestige': fort['prestige'],
+            'pokemon_id': fort['guard_pokemon_id'],
+            'pokemon_name': pokemon_name,
+            'team': fort['team'],
+            'lat': fort['lat'],
+            'lon': fort['lon'],
+        })
+
+    return markers
+
+def get_pokemarkers_old(pokemons):
     markers = []
 
     for pokemon in pokemons:

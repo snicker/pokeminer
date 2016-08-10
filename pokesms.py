@@ -9,8 +9,7 @@ from twilio.rest import TwilioRestClient
 
 geolocator = Nominatim()
 
-with open('locales/pokemon.en.json') as f:
-    pokemon_names = json.load(f)
+from names import POKEMON_NAMES
     
 class SlackMessageClient(object):
     def __init__(self, token):
@@ -34,7 +33,7 @@ class MessageClient(object):
                                            from_=self.twilio_number
                                            )
 def getPokemonName(pokemon_id):
-    return pokemon_names[str(pokemon_id)]
+    return POKEMON_NAMES[pokemon_id]
 
 def getLocation(spawn):
     return geolocator.reverse("{lat}, {lon}".format(lat=spawn.lat,lon=spawn.lon))
@@ -51,47 +50,50 @@ def main():
     logging.debug(config)
     twilio = MessageClient(config['twilio']['number'],config['twilio']['account_sid'],config['twilio']['auth_token'])
     slack = SlackMessageClient(config['slack']['api-token'])
-    spawns = {}
+    spawns = []
     
     while True:
         session = db.Session()
-        for pokemon_id in config['pokemon']:
-            logging.info("Checking spawns for {pokemon_id}...".format(pokemon_id=pokemon_id))
-            newspawns = dbmore.getCurrentSpawns(session,pokemon_id)
-            added = []
-            removed = []
-            if pokemon_id not in spawns:
-                spawns[pokemon_id] = []
-            if newspawns is not None:
-                added, removed = diff(spawns[pokemon_id], newspawns)
-                logging.debug("added: {added}".format(added=added))
-                logging.debug("removed: {removed}".format(removed=removed))
-                spawns[pokemon_id] = newspawns
-            for newspawn in added:
-                logging.info("Pokemon {id} spawned at {lat},{lon}, expires in {expires}".format(id=newspawn.pokemon_id,lat=newspawn.lat,lon=newspawn.lon,expires=newspawn.minsRemaining))
+        newspawns = []
+        logging.info("Checking spawns for {pokemon_ids}...".format(pokemon_ids=config['pokemon']))
+        currentspawns = dbmore.getCurrentSpawns(session,pokemon_ids=config['pokemon'])
+        for spawn in currentspawns:
+            newspawns.append(spawn)
+        logging.info("Checking for rare spawns...")
+        rarespawns = dbmore.getRareSpawns(session)
+        for spawn in rarespawns:
+            newspawns.append(spawn)
+        added = []
+        removed = []
+        if len(newspawns) > 0:
+            added, removed = diff(spawns, newspawns)
+            logging.debug("added: {added}".format(added=added))
+            logging.debug("removed: {removed}".format(removed=removed))
+            spawns = newspawns
+        for newspawn in added:
+            logging.info("Pokemon {id}:{name} spawned at {lat},{lon}, expires in {expires}".format(name=getPokemonName(newspawn.pokemon_id),id=newspawn.pokemon_id,lat=newspawn.lat,lon=newspawn.lon,expires=newspawn.minsRemaining))
+            try:
+                location, hood, zip, address = '','','',''
                 try:
-                    location, hood, zip, address = '','','',''
-                    try:
-                        location = getLocation(newspawn)
-                        if 'neighbourhood' in location.raw['address']:
-                            hood = location.raw['address']['neighbourhood']
-                        else:
-                            hood = location.raw['address']['city']
-                        zip = location.raw['address']['postcode']
-                        if 'house_number' in location.raw['address']:
-                            address = "{hn} {road}".format(hn=location.raw['address']['house_number'],road=location.raw['address']['road'])
-                    except Exception as e:
-                        logging.error("FUCK {e}".format(e=e))
-                    message = "{name} spawned in {hood} ({zip}), available for {expires} minutes. {address} {link}".format(link=getMapLink(newspawn),address=address,hood=hood,zip=zip,name=getPokemonName(newspawn.pokemon_id),expires=newspawn.minsRemaining)
-                    #for number in config['destinations']:
-                        #logging.info('Sending "{message}" to {number}...'.format(message=message,number=number))
-                        #twilio.send_message(message,number)
-                    slack.send_message_to_channel(config['slack']['channel'],message)
+                    location = getLocation(newspawn)
+                    if 'neighbourhood' in location.raw['address']:
+                        hood = location.raw['address']['neighbourhood']
+                    else:
+                        hood = location.raw['address']['city']
+                    zip = location.raw['address']['postcode']
+                    if 'house_number' in location.raw['address']:
+                        address = "{hn} {road}".format(hn=location.raw['address']['house_number'],road=location.raw['address']['road'])
                 except Exception as e:
                     logging.error("FUCK {e}".format(e=e))
-            for spawn in removed:
-                pass
-            time.sleep(1)
+                message = "{name} spawned in {hood} ({zip}), available for {expires} minutes. {address} {link}".format(link=getMapLink(newspawn),address=address,hood=hood,zip=zip,name=getPokemonName(newspawn.pokemon_id),expires=newspawn.minsRemaining)
+                #for number in config['destinations']:
+                    #logging.info('Sending "{message}" to {number}...'.format(message=message,number=number))
+                    #twilio.send_message(message,number)
+                slack.send_message_to_channel(config['slack']['channel'],message)
+            except Exception as e:
+                logging.error("FUCK {e}".format(e=e))
+        for spawn in removed:
+            pass
         session.close()
         time.sleep(10)
 

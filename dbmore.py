@@ -37,12 +37,20 @@ class RareSpawns(Base):
     lat = Column(String(16))
     lon = Column(String(16))
     minsRemaining = Column(Float)
+        
+    def __hash__(self):
+        return self.id
+    
+    def __eq__(self, other):
+        return self.id == other.id
 
 def getRareSpawns(session):
     return session.query(RareSpawns).all()
 
-def getCurrentSpawns(session,pokemon_id=None):
-    query = session.query(CurrentSpawns)
+def getCurrentSpawns(session,pokemon_id=None,pokemon_ids=[]):
     if pokemon_id is not None:
-        query = query.filter(CurrentSpawns.pokemon_id == pokemon_id)
+        pokemon_ids.append(pokemon_id)
+    query = session.query(CurrentSpawns)
+    if len(pokemon_ids) > 0:
+        query = query.filter(CurrentSpawns.pokemon_id.in_(pokemon_ids))
     return query.all()
