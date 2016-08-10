@@ -4,13 +4,25 @@ import json
 import logging
 import time
 from geopy.geocoders import Nominatim
+from slackclient import SlackClient
 from twilio.rest import TwilioRestClient
 
 geolocator = Nominatim()
 
 with open('locales/pokemon.en.json') as f:
     pokemon_names = json.load(f)
-
+    
+class SlackMessageClient(object):
+    def __init__(self, token):
+        self.token = token
+        self.slack = SlackClient(self.token)
+    
+    def send_message_to_username(self, user, message):
+        return self.send_message_to_channel('@{user}'.format(user=user),message)
+    
+    def send_message_to_channel(self, channel, message):
+        return self.slack.api_call("chat.postMessage",channel=channel,text=message,as_user="true")
+        
 class MessageClient(object):
     def __init__(self,twilio_number,twilio_account_sid,twilio_auth_token):
         self.twilio_number = twilio_number
@@ -38,6 +50,7 @@ def main():
         config = json.load(f)
     logging.debug(config)
     twilio = MessageClient(config['twilio']['number'],config['twilio']['account_sid'],config['twilio']['auth_token'])
+    slack = SlackMessageClient(config['slack']['api-token'])
     spawns = {}
     
     while True:
@@ -70,14 +83,16 @@ def main():
                     except Exception as e:
                         logging.error("FUCK {e}".format(e=e))
                     message = "{name} spawned in {hood} ({zip}), available for {expires} minutes. {address} {link}".format(link=getMapLink(newspawn),address=address,hood=hood,zip=zip,name=getPokemonName(newspawn.pokemon_id),expires=newspawn.minsRemaining)
-                    for number in config['destinations']:
-                        logging.info('Sending "{message}" to {number}...'.format(message=message,number=number))
+                    #for number in config['destinations']:
+                        #logging.info('Sending "{message}" to {number}...'.format(message=message,number=number))
                         #twilio.send_message(message,number)
+                    slack.send_message_to_channel(config['slack']['channel'],message)
                 except Exception as e:
                     logging.error("FUCK {e}".format(e=e))
             for spawn in removed:
                 pass
             time.sleep(1)
+        session.close()
         time.sleep(10)
 
     
