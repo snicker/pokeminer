@@ -59,16 +59,19 @@ def rarespawns():
         'newmap2.html',
         area_name=app_config.AREA_NAME,
         map_center=map_center,
+        more_title="Rare Spawns",
         endpoint='/data/rares'
     )
 
 @app.route('/<int:pokemon_id>')
 def currentspawns(pokemon_id):
     map_center = utils.get_map_center()
+    pokemon_name = web.POKEMON_NAMES[pokemon_id]
     return render_template(
         'newmap2.html',
         area_name=app_config.AREA_NAME,
         map_center=map_center,
+        more_title=" - {} Spawns".format(pokemon_name),
         endpoint='/data/bypokemon/' + str(pokemon_id)
     )
 
