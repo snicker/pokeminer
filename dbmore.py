@@ -48,9 +48,13 @@ def getRareSpawns(session):
     return session.query(RareSpawns).all()
 
 def getCurrentSpawns(session,pokemon_id=None,pokemon_ids=[]):
+    ids = []
     if pokemon_id is not None:
-        pokemon_ids.append(pokemon_id)
-    query = session.query(CurrentSpawns)
+        ids.append(pokemon_id)
     if len(pokemon_ids) > 0:
-        query = query.filter(CurrentSpawns.pokemon_id.in_(pokemon_ids))
+        for id in pokemon_ids:
+            ids.append(id)
+    query = session.query(CurrentSpawns)
+    if len(ids) > 0:
+        query = query.filter(CurrentSpawns.pokemon_id.in_(ids))
     return query.all()
