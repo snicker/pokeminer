@@ -20,11 +20,28 @@ import web
 
 app = web.app
 
+@app.route('/')
+def snickerweb_fullmap():
+    map_center = utils.get_map_center()
+    return render_template(
+        'newmap2.html',
+        area_name=web.config.AREA_NAME,
+        map_center=map_center,
+    )
+
 @app.route('/data/rares')
 def rare_pokemon_data():
     return json.dumps(get_rare_pokemarkers())
+
+@app.route('/data/pokemon')
+def data_pokemon_only():
+    return json.dumps(get_pokemarkers_for_pokemon())
+
+@app.route('/data/forts')
+def data_forts_only():
+    return json.dumps(get_pokemarkers_for_forts())
     
-@app.route('/data/bypokemon/<int:pokemon_id>')
+@app.route('/data/pokemon/<int:pokemon_id>')
 def bypokemon_data(pokemon_id):
     return json.dumps(get_pokemarkers_for_pokemon(pokemon_id))
 
@@ -72,7 +89,7 @@ def currentspawns(pokemon_id):
         area_name=app_config.AREA_NAME,
         map_center=map_center,
         more_title=" - {} Spawns".format(pokemon_name),
-        endpoint='/data/bypokemon/' + str(pokemon_id)
+        endpoint='/data/pokemon/' + str(pokemon_id)
     )
 
 def get_rare_pokemarkers():
@@ -81,11 +98,17 @@ def get_rare_pokemarkers():
     session.close()
     return get_pokemarkers(pokemons=pokemons)
 
-def get_pokemarkers_for_pokemon(pokemon_id):
+def get_pokemarkers_for_pokemon(pokemon_id=None):
     session = db.Session()
     pokemons = dbmore.getCurrentSpawns(session,pokemon_id=pokemon_id)
     session.close()
     return get_pokemarkers(pokemons=pokemons)
+    
+def get_pokemarkers_for_forts(fort_id=None):
+    session = db.Session()
+    forts = db.get_forts(session)
+    session.close()
+    return get_pokemarkers(forts=forts)
 
 def get_pokemarkers(pokemons={},forts={}):
     markers = []
@@ -160,7 +183,12 @@ def get_pokemarkers_old(pokemons):
     
 if __name__ == '__main__':
     args = web.get_args()
-    from gevent.wsgi import WSGIServer
-    http_server = WSGIServer((args.host, args.port), app)
-    http_server.serve_forever()
-    #app.run(threaded=True, host=args.host, port=args.port)
+    #from gevent.wsgi import WSGIServer
+    #http_server = WSGIServer((args.host, args.port), app)
+    #http_server.serve_forever()
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == 'fullmap':
+            rule.endpoint = 'snickerweb_fullmap'
+            rule.refresh()
+    print(app.url_map)
+    app.run(threaded=True, host=args.host, port=args.port)

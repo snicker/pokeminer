@@ -71,9 +71,9 @@
             }
         });
 
-        function getMarkers () {
+        function getMarkers (endpoint='/data') {
             return new Promise(function (resolve, reject) {
-                $.get('{{ endpoint }}', function (response) {
+                $.get(endpoint, function (response) {
                     resolve($.parseJSON(response));
                 });
             });
@@ -184,11 +184,30 @@
                 }
             });
         }
+		
+		var refresh_types = {
+			Pokemon: true,
+			Gyms: false,
+			Trash: false
+		}
 
         function refresh () {
-            getMarkers().then(function (data) {
+			{% if endpoint %}
+            getMarkers('{{ endpoint }}').then(function (data) {
                 addMarkersToMap(data, map);
             });
+			{% else %}
+			if (refresh_types['Gyms']) {
+				getMarkers('/data/forts').then(function (data) {
+					addMarkersToMap(data, map);
+				});
+			}
+			if (refresh_types['Pokemon'] || refresh_types['Trash']) {
+				getMarkers('/data/pokemon').then(function (data) {
+					addMarkersToMap(data, map);
+				});
+			}
+			{% endif %}
         }
 
         var workersLoaded = false;
@@ -216,7 +235,16 @@
             if (event.name === 'Workers' && !workersLoaded) {
                 loadWorkersLayer();
             }
+			if (event.name === 'Gyms' || event.name === 'Pokemon' || event.name === 'Trash') {
+				refresh_types[event.name] = true;
+				refresh();
+			}
         });
+		map.on('overlayremove', function (event) {
+			if (event.name === 'Gyms' || event.name === 'Pokemon' || event.name === 'Trash') {
+				refresh_types[event.name] = false;
+			}
+		});
         L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {opacity: 0.5}).addTo(map);
         map.whenReady(function () {
             $('.my-location').on('click', function () {
