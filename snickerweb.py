@@ -181,6 +181,13 @@ def get_pokemarkers_old(pokemons):
 
     return markers
     
+
+for rule in app.url_map.iter_rules():
+    if rule.endpoint == 'fullmap':
+        rule.endpoint = 'snickerweb_fullmap'
+        rule.refresh()
+print(app.url_map)
+    
 if __name__ == '__main__':
     args = web.get_args()
     #from gevent.wsgi import WSGIServer
