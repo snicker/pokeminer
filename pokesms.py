@@ -73,16 +73,22 @@ def main():
         for newspawn in added:
             logging.info("Pokemon {id}:{name} spawned at {lat},{lon}, expires in {expires}".format(name=getPokemonName(newspawn.pokemon_id),id=newspawn.pokemon_id,lat=newspawn.lat,lon=newspawn.lon,expires=newspawn.minsRemaining))
             try:
-                location, hood, zip, address = '','','',''
+                location, hood, zip, address, hn, road = '','','','','',''
                 try:
                     location = getLocation(newspawn)
+                    logging.debug(location.raw)
+                    zip = location.raw['address']['postcode']
                     if 'neighbourhood' in location.raw['address']:
                         hood = location.raw['address']['neighbourhood']
-                    else:
+                    elif 'city' in location.raw['address']:
                         hood = location.raw['address']['city']
-                    zip = location.raw['address']['postcode']
+                    elif 'town' in location.raw['address']:
+                        hood = location.raw['address']['town']
                     if 'house_number' in location.raw['address']:
-                        address = "{hn} {road}".format(hn=location.raw['address']['house_number'],road=location.raw['address']['road'])
+                        hn = location.raw['address']['house_number']
+                    if 'road' in location.raw['address']:
+                        road = location.raw['address']['road']
+                    address = "{hn} {road}".format(hn=hn,road=road)
                 except Exception as e:
                     logging.error("FUCK {e}".format(e=e))
                 message = "{name} spawned in {hood} ({zip}), available for {expires} minutes. {address} {link}".format(link=getMapLink(newspawn),address=address,hood=hood,zip=zip,name=getPokemonName(newspawn.pokemon_id),expires=newspawn.minsRemaining)
